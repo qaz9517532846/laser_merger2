@@ -1,2 +1,2 @@
 # laser_merger2
-Multi Laser scan merger package for ROS2 foxy. 
+laser merger from two scan topic under ROS2.
