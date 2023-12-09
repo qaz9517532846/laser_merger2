@@ -69,6 +69,7 @@ class laser_merger2 : public rclcpp::Node
     laser_geometry::LaserProjection projector_;
 
     rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::Time laserTime;
 
     // ROS Parameters
     std::shared_ptr<rclcpp::Rate> rosRate;

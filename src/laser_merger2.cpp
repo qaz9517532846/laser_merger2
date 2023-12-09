@@ -76,8 +76,9 @@ laser_merger2::~laser_merger2()
 
 void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
 {
-    //std::lock_guard<std::mutex> lock(nodeMutex_);
+    std::lock_guard<std::mutex> lock(nodeMutex_);
 
+    laserTime = scan->header.stamp;
     scanBuffer[scan->header.frame_id] = scan;
 }
 
@@ -166,7 +167,7 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
     auto pclMsg = std::make_shared<sensor_msgs::msg::PointCloud2>();
     
     pclMsg->header.frame_id = target_frame_;
-    pclMsg->header.stamp = this->now();
+    pclMsg->header.stamp = laserTime;
 
     pclMsg->height = 1;
     pclMsg->width = points.size();
@@ -183,7 +184,7 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
     sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
     //sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
 
-    for(int i = 0; i < pclMsg->width; i++)
+    for(size_t i = 0; i < pclMsg->width; i++)
     {
         //uint32_t rgb_value = rgb_to_uint32(255, 0, 0);
         *iter_x = points[i].x;
@@ -202,7 +203,7 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
 void laser_merger2::ConvertLaserScan(std::vector<SCAN_POINT_t> points)
 {
     auto scan_msg = std::make_unique<sensor_msgs::msg::LaserScan>();
-    scan_msg->header.stamp = this->now();
+    scan_msg->header.stamp = laserTime;
     scan_msg->header.frame_id = target_frame_;
     
     scan_msg->angle_min = min_angle;
@@ -222,7 +223,7 @@ void laser_merger2::ConvertLaserScan(std::vector<SCAN_POINT_t> points)
     else
         scan_msg->ranges.assign(ranges_size, scan_msg->range_max + inf_epsilon);
     
-    for(int i = 0; i < points.size(); i++)
+    for(size_t i = 0; i < points.size(); i++)
     {
         double range = hypot(points[i].x, points[i].y);
         double angle = atan2(points[i].y, points[i].x);
@@ -247,8 +248,6 @@ void laser_merger2::laser_merge()
     
     while(rclcpp::ok(context) && alive_.load())
     {
-        //std::lock_guard<std::mutex> lock(nodeMutex_);
-
         std::vector<SCAN_POINT_t> points;
         
         // convert all scans to current base frame
@@ -258,8 +257,11 @@ void laser_merger2::laser_merge()
             points.insert(points.end(), scanPoints.begin(), scanPoints.end());
         }
 
-        ConvertPointCloud2(points);
-        ConvertLaserScan(points);
+        {
+            std::lock_guard<std::mutex> lock(nodeMutex_);
+            ConvertPointCloud2(points);
+            ConvertLaserScan(points);
+        }
 
         rosRate->sleep();
     }
