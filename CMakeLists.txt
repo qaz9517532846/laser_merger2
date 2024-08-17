@@ -3,6 +3,10 @@ project(laser_merger2)
 
 set(PCL_INCLUDE_DIRS /usr/include/pcl-1.10)  
 
+set(CUDA_MIN_VERSION "10.0")
+
+add_definitions(-DUSE_LASER_NUM=2)
+
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
   set(CMAKE_C_STANDARD 99)
@@ -26,9 +30,18 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(pcl_conversions REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(CUDA REQUIRED)
+
+set(CUDA_SEPARABLE_COMPILATION ON)
+set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+set(CUDA_ARCHITECTURES "native")
+
+include_directories(
+  ${CUDA_INCLUDE_DIRS} 
+  include
+)
+
+link_directories(/usr/local/cuda/lib64)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -41,9 +54,16 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-add_executable(laser_merger2 src/laser_merger2.cpp src/laser_merger2_main.cpp)
-target_include_directories(laser_merger2 PUBLIC include)
+# List of source files
+
+cuda_add_executable(laser_merger2
+  src/laser_merger2.cpp
+  src/laser_merger2_main.cpp
+  src/cuda_pointcloud.cu
+)
+
 ament_target_dependencies(laser_merger2 rclcpp tf2_ros tf2_sensor_msgs PCL pcl_conversions laser_geometry sensor_msgs)
+target_link_libraries(laser_merger2 ${CUDA_LIBRARIES} cublas)
 
 install(TARGETS
   laser_merger2

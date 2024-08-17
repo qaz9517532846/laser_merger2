@@ -10,7 +10,6 @@
 laser_merger2::laser_merger2() : Node("laser_merger2")
 {
     this->declare_parameter<std::string>("target_frame", "base_link");
-    this->declare_parameter<int>("laser_num", 2);
     this->declare_parameter<double>("transform_tolerance", 0.01);
     this->declare_parameter<double>("rate", 30.0);
     this->declare_parameter<int>("queue_size", 20);
@@ -25,7 +24,6 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
     this->declare_parameter<bool>("use_inf", true);
 
     this->get_parameter("target_frame", target_frame_);
-    this->get_parameter("laser_num", laser_num);
     this->get_parameter("transform_tolerance", tolerance_);
     this->get_parameter("rate", rate_);
     this->get_parameter("queue_size", input_queue_size_);
@@ -51,14 +49,15 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
         tf2_->setCreateTimerInterface(timer_interface);
         tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
 
-        laser_sub.resize(laser_num);
-        for(int i = 0; i < laser_num; i++)
+        laser_sub.resize(USE_LASER_NUM);
+        tfInit.resize(USE_LASER_NUM);
+        for(int i = 0; i < USE_LASER_NUM; i++)
         {
             std::string ScanTopicName;
             ScanTopicName = "/scan_" + std::to_string(i);
             laser_sub[i] = this->create_subscription<sensor_msgs::msg::LaserScan>(ScanTopicName, 10, [this, i,  ScanTopicName](const sensor_msgs::msg::LaserScan::SharedPtr msg)
             {
-                scanCallback(msg, ScanTopicName);
+                scanCallback(msg, i);
             }
             );
         }
@@ -74,31 +73,41 @@ laser_merger2::~laser_merger2()
 }
 
 
-void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
+void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, int laserIdx)
 {
     std::lock_guard<std::mutex> lock(nodeMutex_);
 
     laserTime = scan->header.stamp;
-    scanBuffer[scan->header.frame_id] = scan;
+    if(!tfInit[laserIdx])
+    {
+        scanData[laserIdx].dataSize = scan->ranges.size();
+        InitDataBuffer(laserIdx, scanData[laserIdx].dataSize);
+        CalculateMatrix(laserIdx, scan->header.frame_id);
+        tfInit[laserIdx] = true;
+    }
+    else
+    {
+        memcpy(&scanData[laserIdx].pose[0], scan->ranges.data(), scanData[laserIdx].dataSize * sizeof(float));
+        ScanToTransformedPointCloud(scanData[laserIdx].pose, scan->angle_min, scan->angle_max, scanData[laserIdx].dataSize, scanData[laserIdx].tranMatrixTF, scanData[laserIdx].outPose);
+    }
 }
 
-Eigen::Matrix4d laser_merger2::Rotate3Z(double rad)
+void laser_merger2::InitDataBuffer(int laserIdx, int dataNum)
 {
-    Eigen::Matrix4d res;
-	res.setZero();
-    res(0, 0) = std::cos(rad);
-    res(0, 1) = -1 * std::sin(rad);
-    res(1, 0) = std::sin(rad);
-    res(1, 1) = std::cos(rad);
-    res(2, 2) = 1;
-    res(3, 3) = 1;
+    float *unitPtr;
+    InitGpuBuffer(&scanData[laserIdx].pose, &scanData[laserIdx].tranMatrixTF, &scanData[laserIdx].outPose, dataNum);
+    unitPtr = &scanData[laserIdx].pose[dataNum * 3];
 
-    return res;
+    for(int i = 0 ; i < dataNum ; i ++)
+    {
+        *unitPtr = 1;
+        unitPtr++;
+    }
 }
 
-Eigen::Matrix4d laser_merger2::ConvertTransMatrix(geometry_msgs::msg::TransformStamped trans)
+Eigen::Matrix4f laser_merger2::ConvertTransMatrix(geometry_msgs::msg::TransformStamped trans)
 {
-    Eigen::Matrix4d res;
+    Eigen::Matrix4f res;
     // Convert geometry_msgs quaternion to tf2 quaternion
     tf2::Quaternion quaternion;
     tf2::fromMsg(trans.transform.rotation, quaternion);
@@ -108,53 +117,35 @@ Eigen::Matrix4d laser_merger2::ConvertTransMatrix(geometry_msgs::msg::TransformS
     tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
 
 	res.setZero();
-    res(0, 0) = std::cos(yaw);
-    res(0, 1) = -1 * std::sin(yaw);
-    res(1, 0) = std::sin(yaw);
-    res(1, 1) = std::cos(yaw);
+    res(0, 0) = cos(yaw);
+    res(0, 1) = -sin(yaw);
+    res(1, 0) = sin(yaw);
+    res(1, 1) = cos(yaw);
 	res(0, 3) = trans.transform.translation.x;
 	res(1, 3) = trans.transform.translation.y;
 	res(2, 3) = trans.transform.translation.z;
-	res(2, 2) = 1;
-	res(3, 3) = 1;
+	res(2, 2) = 1.0f;
+	res(3, 3) = 1.0f;
 
 	return res;
 }
 
-std::vector<SCAN_POINT_t> laser_merger2::scantoPointXYZ(const sensor_msgs::msg::LaserScan::SharedPtr scan)
+void laser_merger2::CalculateMatrix(int laserIdx, std::string frame)
 {
-    std::vector<SCAN_POINT_t> points;
     geometry_msgs::msg::TransformStamped sensorToBase;
 
     try
     {
-        sensorToBase = tf2_->lookupTransform(target_frame_, scan->header.frame_id, tf2::TimePointZero);
+        sensorToBase = tf2_->lookupTransform(target_frame_, frame, tf2::TimePointZero);
     }
     catch(const tf2::TransformException & ex)
     {
-        RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", target_frame_.c_str(), scan->header.frame_id.c_str(), ex.what());
-        return points;
+        RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", target_frame_.c_str(), frame.c_str(), ex.what());
+        return;
     }
 
-    const Eigen::Matrix4d T = ConvertTransMatrix(sensorToBase);
-
-    for(size_t i = 0; i < scan->ranges.size(); ++i)
-	{
-		if(scan->ranges[i] <= scan->range_min || scan->ranges[i] >= scan->range_max)
-		{
-			continue;	// no actual measurement
-		}
-
-		// transform sensor points into base coordinate system
-		const Eigen::Matrix<double, 4, 1> scanRange{scan->ranges[i], 0, 0, 1};
-		const Eigen::Matrix<double, 4, 1> scanPos = T * Rotate3Z(scan->angle_min + i * scan->angle_increment) * scanRange;
-		SCAN_POINT_t point;
-		point.x = scanPos(0, 0);
-		point.y = scanPos(1, 0);
-		points.emplace_back(point);
-	}
-	
-	return points;
+    const Eigen::Matrix4f T = ConvertTransMatrix(sensorToBase);
+    memcpy(&scanData[laserIdx].tranMatrixTF[0], T.data(), 4 * 4 * sizeof(float));
 }
 
 uint32_t laser_merger2::rgb_to_uint32(uint8_t r, uint8_t g, uint8_t b)
@@ -251,10 +242,23 @@ void laser_merger2::laser_merge()
         std::vector<SCAN_POINT_t> points;
         
         // convert all scans to current base frame
-        for(const auto& scan : scanBuffer)
+        for(int i = 0; i < USE_LASER_NUM; i++)
         {
-            auto scanPoints = scantoPointXYZ(scan.second);
-            points.insert(points.end(), scanPoints.begin(), scanPoints.end());
+            float *iter_x = scanData[i].outPose;
+            float *iter_y = scanData[i].outPose + scanData[i].dataSize - 1;
+            float *iter_z = scanData[i].outPose + scanData[i].dataSize * 2 - 1;
+
+            for(int j = 0; j < scanData[i].dataSize; j++)
+            {
+                SCAN_POINT_t pose;
+                pose.x = *iter_x;
+                pose.y = *iter_y;
+                pose.z = *iter_z;
+                //printf("x = %f, y = %f, z = %f\n", pose.x, pose.y, pose.z);
+
+                points.push_back(pose);
+                iter_x ++; iter_y ++; iter_z ++;
+            }
         }
 
         {

@@ -3,6 +3,7 @@
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
+  InitGPUDev();
   rclcpp::spin(std::make_shared<laser_merger2>());
   rclcpp::shutdown();
   return 0;
