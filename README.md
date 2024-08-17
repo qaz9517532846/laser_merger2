@@ -7,9 +7,9 @@ Muilti laser merger to pointcloud2 and laserScan for ROS2.
 
 ## Required Package
 
-- ![NVIDIA CUDA](https://developer.nvidia.com/cuda-toolkit)
+- NVIDIA CUDA - https://developer.nvidia.com/cuda-toolkit
 
-- ![NVIDIA CUBLAS](https://developer.nvidia.com/cublas)
+- NVIDIA CUBLAS - https://developer.nvidia.com/cublas
 
 ------
 
@@ -19,6 +19,13 @@ Muilti laser merger to pointcloud2 and laserScan for ROS2.
 
 ``` bash
 $ git clone https://github.com/qaz9517532846/laser_merger2.git
+```
+## Setting Laser Subscribe amount
+
+Enter CMakeLists.txt to line 8 edit USE_LASER_NUM macro.
+
+``` bash
+add_definitions(-DUSE_LASER_NUM=2)
 ```
 
 ### ROS2 topic
