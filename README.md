@@ -5,6 +5,12 @@ Muilti laser merger to pointcloud2 and laserScan for ROS2.
 
 - ROS Foxy under Ubuntu 20.04 LTS
 
+## Requred Package
+
+- NVIDIA CUDA Package
+
+- NVIDIA Cublas Package
+
 ------
 
 ## Getting Started
