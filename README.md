@@ -22,7 +22,7 @@ $ git clone https://github.com/qaz9517532846/laser_merger2.git
 ```
 ## Setting Laser Subscribe amount
 
-Enter CMakeLists.txt to line 8 edit USE_LASER_NUM macro.
+Edit the CMakeLists.txt file to modify the USE_LASER_NUM macro on line 8.
 
 ``` bash
 add_definitions(-DUSE_LASER_NUM=2)
