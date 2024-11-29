@@ -76,4 +76,4 @@ $ ros2 run laser_merger2 laser_merger.launch.py
 
 This repository is for your reference only. copying, patent applications, and academic journals are strictly prohibited.
 
-Copyright © 2023 ZM Robotics Software Laboratory.
+Copyright © 2024 ZM Robotics Software Laboratory.
