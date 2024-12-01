@@ -50,6 +50,22 @@ $ git clone https://github.com/qaz9517532846/laser_merger2.git
 ``` bash
 $ ros2 run laser_merger2 laser_merger.launch.py
 ```
+### Result
+
+------
+
+1. Laser 1 Data
+
+![image](https://github.com/qaz9517532846/laser_merger2/blob/main/image/front_laser.png)
+
+2. Laser 2 Data
+
+![image](https://github.com/qaz9517532846/laser_merger2/blob/main/image/rear_laser.png)
+
+
+3. Merge Process Data Result
+
+![image](https://github.com/qaz9517532846/laser_merger2/blob/main/image/merger_laser.png)
 
 ------
 
