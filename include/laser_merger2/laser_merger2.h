@@ -74,11 +74,11 @@ class laser_merger2 : public rclcpp::Node
     // ROS Parameters
     std::shared_ptr<rclcpp::Rate> rosRate;
     std::string target_frame_;
+    std::vector<std::string> scan_topics;
     double tolerance_;
     double rate_;
     int input_queue_size_;
     int subscription_count;
-    int laser_num;
 
     double max_range;
     double min_range;
