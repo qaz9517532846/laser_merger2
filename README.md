@@ -12,7 +12,7 @@ Muilti laser merger to pointcloud2 and laserScan for ROS2.
 ### Installation
 
 ``` bash
-$ git clone https://github.com/leroycorentin/laser_merger2.git
+$ git clone https://github.com/qaz9517532846/laser_merger2.git
 ```
 
 ### ROS2 topic
@@ -84,3 +84,7 @@ $ ros2 launch laser_merger2 laser_merger.launch.py target_frame:=base scan_topic
 This repository is for your reference only. copying, patent applications, and academic journals are strictly prohibited.
 
 Copyright © 2023 ZM Robotics Software Laboratory.
+
+## Acknowledgements
+
+I would like to express our sincere thanks to [leroycorentin] for supporting ROS2 Humble contributions to this project.
