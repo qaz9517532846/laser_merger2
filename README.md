@@ -87,4 +87,4 @@ Copyright © 2023 ZM Robotics Software Laboratory.
 
 ## Acknowledgements
 
-I would like to express our sincere thanks to [leroycorentin] for supporting ROS2 Humble contributions to this project.
+I would like to express our sincere thanks to [@leroycorentin](https://github.com/leroycorentin) for supporting ROS2 Humble contributions to this project.
