@@ -1,16 +1,16 @@
 #include <laser_merger2/laser_merger2.h>
 #include "sensor_msgs/point_cloud2_iterator.hpp"
-#include "tf2_sensor_msgs/tf2_sensor_msgs.h"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 #include "tf2_ros/create_timer_ros.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2/LinearMath/Quaternion.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <boost/bind.hpp>
 
 laser_merger2::laser_merger2() : Node("laser_merger2")
 {
     this->declare_parameter<std::string>("target_frame", "base_link");
-    this->declare_parameter<int>("laser_num", 2);
+    this->declare_parameter<std::vector<std::string>>("scan_topics", { "/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1" });
     this->declare_parameter<double>("transform_tolerance", 0.01);
     this->declare_parameter<double>("rate", 30.0);
     this->declare_parameter<int>("queue_size", 20);
@@ -25,7 +25,7 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
     this->declare_parameter<bool>("use_inf", true);
 
     this->get_parameter("target_frame", target_frame_);
-    this->get_parameter("laser_num", laser_num);
+    this->get_parameter("scan_topics", scan_topics);
     this->get_parameter("transform_tolerance", tolerance_);
     this->get_parameter("rate", rate_);
     this->get_parameter("queue_size", input_queue_size_);
@@ -51,16 +51,15 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
         tf2_->setCreateTimerInterface(timer_interface);
         tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
 
+        size_t laser_num = scan_topics.size();
         laser_sub.resize(laser_num);
-        for(int i = 0; i < laser_num; i++)
+        for(const std::string &scan_topic : scan_topics)
         {
-            std::string ScanTopicName;
-            ScanTopicName = "/scan_" + std::to_string(i);
-            laser_sub[i] = this->create_subscription<sensor_msgs::msg::LaserScan>(ScanTopicName, 10, [this, i,  ScanTopicName](const sensor_msgs::msg::LaserScan::SharedPtr msg)
-            {
-                scanCallback(msg, ScanTopicName);
-            }
-            );
+            laser_sub.push_back(this->create_subscription<sensor_msgs::msg::LaserScan>(scan_topic, input_queue_size_, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
+                {
+                    scanCallback(msg);
+                }
+            ));
         }
     }
     
@@ -74,7 +73,7 @@ laser_merger2::~laser_merger2()
 }
 
 
-void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
+void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan)
 {
     std::lock_guard<std::mutex> lock(nodeMutex_);
 

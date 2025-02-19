@@ -24,6 +24,7 @@ find_package(tf2_ros REQUIRED)
 find_package(laser_geometry REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common io)
 find_package(pcl_conversions REQUIRED)
 # uncomment the following section in order to fill in
@@ -43,7 +44,7 @@ endif()
 
 add_executable(laser_merger2 src/laser_merger2.cpp src/laser_merger2_main.cpp)
 target_include_directories(laser_merger2 PUBLIC include)
-ament_target_dependencies(laser_merger2 rclcpp tf2_ros tf2_sensor_msgs PCL pcl_conversions laser_geometry sensor_msgs)
+ament_target_dependencies(laser_merger2 rclcpp tf2_ros tf2_sensor_msgs tf2_geometry_msgs PCL pcl_conversions laser_geometry sensor_msgs)
 
 install(TARGETS
   laser_merger2
