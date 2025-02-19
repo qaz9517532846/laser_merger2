@@ -38,7 +38,9 @@ $ git clone https://github.com/leroycorentin/laser_merger2.git
 | scan_time                          | Merge laser scan scan time.                                       |
 | angle_increment                    | Merge laser scan angle increment.                                 |
 | inf_epsilon                        | inf epsilon value.                                                |
-| use_inf                            | use inf.                                                          ||
+| use_inf                            | use inf.                                                          |
+| output_pointcloud_topic            | Name of the output merged point cloud topic                       |
+| output_scan_topic                  | Name of the output merged scan topic                              ||
 
 ### Run
 
@@ -49,7 +51,7 @@ $ ros2 launch laser_merger2 laser_merger.launch.py
 ```
 For example:
 ``` bash
-$ ros2 launch laser_merger2 laser_merger.launch.py target_frame:=base scan_topics:="[/lidar, /lidar2]"
+$ ros2 launch laser_merger2 laser_merger.launch.py target_frame:=base scan_topics:="[/lidar, /lidar2]" output_pointcloud_topic:=/merged_pcl
 ```
 
 ### Result

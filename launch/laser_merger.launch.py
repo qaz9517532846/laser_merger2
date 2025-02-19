@@ -24,6 +24,9 @@ def generate_launch_description():
     inf_epsilon = LaunchConfiguration('inf_epsilon', default=1.0)
     use_inf = LaunchConfiguration('use_inf', default=True)
 
+    output_pointcloud_topic = LaunchConfiguration('output_pointcloud_topic', default="pointcloud")
+    output_scan_topic = LaunchConfiguration('output_scan_topic', default="scan")
+
     return LaunchDescription([
         Node(
             package='laser_merger2',
@@ -44,5 +47,9 @@ def generate_launch_description():
                         {'inf_epsilon': inf_epsilon},
                         {'use_inf': use_inf}
             ],
+            remappings=[
+                ('/pointcloud', output_pointcloud_topic),
+                ('/scan', output_scan_topic)
+            ]
         ),
     ])
