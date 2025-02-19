@@ -42,7 +42,7 @@ class laser_merger2 : public rclcpp::Node
     ~laser_merger2();
 
   private:
-    void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic);
+    void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan);
     std::vector<SCAN_POINT_t> scantoPointXYZ(const sensor_msgs::msg::LaserScan::SharedPtr scan);
     Eigen::Matrix4d Rotate3Z(double rad);
     Eigen::Matrix4d ConvertTransMatrix(geometry_msgs::msg::TransformStamped trans);

@@ -56,10 +56,10 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
         {
             std::string ScanTopicName;
             ScanTopicName = "/scan_" + std::to_string(i);
-            laser_sub[i] = this->create_subscription<sensor_msgs::msg::LaserScan>(ScanTopicName, 10, [this, i,  ScanTopicName](const sensor_msgs::msg::LaserScan::SharedPtr msg)
-            {
-                scanCallback(msg, ScanTopicName);
-            }
+            laser_sub[i] = this->create_subscription<sensor_msgs::msg::LaserScan>(ScanTopicName, 10, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
+                {
+                    scanCallback(msg);
+                }
             );
         }
     }
@@ -74,7 +74,7 @@ laser_merger2::~laser_merger2()
 }
 
 
-void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan, std::string topic)
+void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan)
 {
     std::lock_guard<std::mutex> lock(nodeMutex_);
 
