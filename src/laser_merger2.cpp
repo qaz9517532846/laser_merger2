@@ -249,18 +249,19 @@ void laser_merger2::laser_merge()
     {
         std::vector<SCAN_POINT_t> points;
         
-        // convert all scans to current base frame
-        for(const auto& scan : scanBuffer)
-        {
-            auto scanPoints = scantoPointXYZ(scan.second);
-            points.insert(points.end(), scanPoints.begin(), scanPoints.end());
-        }
-
         {
             std::lock_guard<std::mutex> lock(nodeMutex_);
-            ConvertPointCloud2(points);
-            ConvertLaserScan(points);
+
+            // convert all scans to current base frame
+            for(const auto& scan : scanBuffer)
+            {
+                auto scanPoints = scantoPointXYZ(scan.second);
+                points.insert(points.end(), scanPoints.begin(), scanPoints.end());
+            }
         }
+
+        ConvertPointCloud2(points);
+        ConvertLaserScan(points);
 
         rosRate->sleep();
     }
