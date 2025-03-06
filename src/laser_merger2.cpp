@@ -258,10 +258,14 @@ void laser_merger2::laser_merge()
                 auto scanPoints = scantoPointXYZ(scan.second);
                 points.insert(points.end(), scanPoints.begin(), scanPoints.end());
             }
+            scanBuffer.clear();
         }
 
-        ConvertPointCloud2(points);
-        ConvertLaserScan(points);
+        if (!points.empty()) {
+            RCLCPP_DEBUG(this->get_logger(), "Publishing %ld merged points", points.size());
+            ConvertPointCloud2(points);
+            ConvertLaserScan(points);
+        }
 
         rosRate->sleep();
     }
