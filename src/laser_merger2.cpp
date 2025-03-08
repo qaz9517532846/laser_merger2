@@ -137,6 +137,7 @@ std::vector<SCAN_POINT_t> laser_merger2::scantoPointXYZ(const sensor_msgs::msg::
 
     const Eigen::Matrix4d T = ConvertTransMatrix(sensorToBase);
 
+    bool has_intensity = scan->intensities.size() == scan->ranges.size();
     for(size_t i = 0; i < scan->ranges.size(); ++i)
 	{
 		if(scan->ranges[i] <= scan->range_min || scan->ranges[i] >= scan->range_max)
@@ -150,6 +151,8 @@ std::vector<SCAN_POINT_t> laser_merger2::scantoPointXYZ(const sensor_msgs::msg::
 		SCAN_POINT_t point;
 		point.x = scanPos(0, 0);
 		point.y = scanPos(1, 0);
+        if (has_intensity)
+            point.intensity = scan->intensities[i];
 		points.emplace_back(point);
 	}
 	
@@ -163,6 +166,9 @@ uint32_t laser_merger2::rgb_to_uint32(uint8_t r, uint8_t g, uint8_t b)
 
 void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
 {
+    if (points.empty())
+        return;
+
     auto pclMsg = std::make_shared<sensor_msgs::msg::PointCloud2>();
     
     pclMsg->header.frame_id = target_frame_;
@@ -172,15 +178,26 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
     pclMsg->width = points.size();
 
     sensor_msgs::PointCloud2Modifier modifier(*pclMsg);
-    modifier.setPointCloud2FieldsByString(1, "xyz");
-    /*modifier.setPointCloud2Fields(4, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "rgb", 1, sensor_msgs::msg::PointField::FLOAT32);*/
+    bool has_intensity = points[0].intensity.has_value();
+    if (has_intensity)
+    {
+        modifier.setPointCloud2Fields(4, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
+                                         // "rgb", 1, sensor_msgs::msg::PointField::FLOAT32);
+    }
+    else
+    {
+        modifier.setPointCloud2Fields(4, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32);
+    }
 
     sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
     sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
     sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(*pclMsg, "intensity");
     //sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
 
     for(size_t i = 0; i < pclMsg->width; i++)
@@ -189,11 +206,15 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
         *iter_x = points[i].x;
         *iter_y = points[i].y;
         *iter_z = points[i].z;
+        if (has_intensity)
+            *iter_intensity = points[i].intensity.value();
 
         /*float* rgb_ptr = reinterpret_cast<float*>(&rgb_value);
         *iter_rgb = *rgb_ptr;*/
 
         ++iter_x; ++iter_y; ++iter_z; //++iter_rgb;
+        if (has_intensity)
+            ++iter_intensity;
     }
 
     pclPub_->publish(*pclMsg);
@@ -201,6 +222,9 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
 
 void laser_merger2::ConvertLaserScan(std::vector<SCAN_POINT_t> points)
 {
+    if (points.empty())
+        return;
+
     auto scan_msg = std::make_unique<sensor_msgs::msg::LaserScan>();
     scan_msg->header.stamp = laserTime;
     scan_msg->header.frame_id = target_frame_;
@@ -221,7 +245,11 @@ void laser_merger2::ConvertLaserScan(std::vector<SCAN_POINT_t> points)
         scan_msg->ranges.assign(ranges_size, std::numeric_limits<double>::infinity());
     else
         scan_msg->ranges.assign(ranges_size, scan_msg->range_max + inf_epsilon);
-    
+
+    bool has_intensity = points[0].intensity.has_value();
+    if (has_intensity)
+        scan_msg->intensities.assign(ranges_size, 0);
+
     for(size_t i = 0; i < points.size(); i++)
     {
         double range = hypot(points[i].x, points[i].y);
@@ -236,6 +264,9 @@ void laser_merger2::ConvertLaserScan(std::vector<SCAN_POINT_t> points)
         {
             scan_msg->ranges[index] = range;
         }
+
+        if (has_intensity)
+            scan_msg->intensities[index] = points[i].intensity.value();
     }
 
     scanPub_->publish(std::move(scan_msg));
@@ -249,15 +280,20 @@ void laser_merger2::laser_merge()
     {
         std::vector<SCAN_POINT_t> points;
         
-        // convert all scans to current base frame
-        for(const auto& scan : scanBuffer)
-        {
-            auto scanPoints = scantoPointXYZ(scan.second);
-            points.insert(points.end(), scanPoints.begin(), scanPoints.end());
-        }
-
         {
             std::lock_guard<std::mutex> lock(nodeMutex_);
+
+            // convert all scans to current base frame
+            for(const auto& scan : scanBuffer)
+            {
+                auto scanPoints = scantoPointXYZ(scan.second);
+                points.insert(points.end(), scanPoints.begin(), scanPoints.end());
+            }
+            scanBuffer.clear();
+        }
+
+        if (!points.empty()) {
+            RCLCPP_DEBUG(this->get_logger(), "Publishing %ld merged points", points.size());
             ConvertPointCloud2(points);
             ConvertLaserScan(points);
         }

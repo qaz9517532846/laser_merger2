@@ -33,6 +33,7 @@ typedef struct{
 	float x;
   float y;
   float z; 
+  std::optional<float> intensity; // Optional intensity field
 } SCAN_POINT_t;
 
 class laser_merger2 : public rclcpp::Node
