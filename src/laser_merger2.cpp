@@ -151,6 +151,7 @@ std::vector<SCAN_POINT_t> laser_merger2::scantoPointXYZ(const sensor_msgs::msg::
 		SCAN_POINT_t point;
 		point.x = scanPos(0, 0);
 		point.y = scanPos(1, 0);
+        point.z = scanPos(2, 0);
         if (has_intensity)
             point.intensity = scan->intensities[i];
 		points.emplace_back(point);
