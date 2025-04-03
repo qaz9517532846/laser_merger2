@@ -47,40 +47,37 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
 
     rosRate = std::make_shared<rclcpp::Rate>(rate_);
 
-    if (!target_frame_.empty())
+    tf2_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(this->get_node_base_interface(), this->get_node_timers_interface());
+    tf2_->setCreateTimerInterface(timer_interface);
+    tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
+
+    size_t num_scan_sub = scan_topics.size();
+    laser_sub.resize(num_scan_sub);
+    for(const std::string &scan_topic : scan_topics)
     {
-        tf2_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(this->get_node_base_interface(), this->get_node_timers_interface());
-        tf2_->setCreateTimerInterface(timer_interface);
-        tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
+        if (scan_topic.empty())
+            continue;
+        RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting LaserScan messages", scan_topic.c_str());
+        laser_sub.push_back(this->create_subscription<sensor_msgs::msg::LaserScan>(scan_topic, input_queue_size_, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
+            {
+                scanCallback(msg);
+            }
+        ));
+    }
 
-        size_t num_scan_sub = scan_topics.size();
-        laser_sub.resize(num_scan_sub);
-        for(const std::string &scan_topic : scan_topics)
-        {
-            if (scan_topic.empty())
-                continue;
-            RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting LaserScan messages", scan_topic.c_str());
-            laser_sub.push_back(this->create_subscription<sensor_msgs::msg::LaserScan>(scan_topic, input_queue_size_, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
-                {
-                    scanCallback(msg);
-                }
-            ));
-        }
-
-        size_t num_cloud_sub = point_cloud_topics.size();
-        point_cloud_sub.resize(num_cloud_sub);
-        for(const std::string &cloud_topic : point_cloud_topics)
-        {
-            if (cloud_topic.empty())
-                continue;
-            RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting PointCloud2 messages", cloud_topic.c_str());
-            point_cloud_sub.push_back(this->create_subscription<sensor_msgs::msg::PointCloud2>(cloud_topic, input_queue_size_, [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-                {
-                    pointCloudCallback(msg);
-                }
-            ));
-        }
+    size_t num_cloud_sub = point_cloud_topics.size();
+    point_cloud_sub.resize(num_cloud_sub);
+    for(const std::string &cloud_topic : point_cloud_topics)
+    {
+        if (cloud_topic.empty())
+            continue;
+        RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting PointCloud2 messages", cloud_topic.c_str());
+        point_cloud_sub.push_back(this->create_subscription<sensor_msgs::msg::PointCloud2>(cloud_topic, input_queue_size_, [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+            {
+                pointCloudCallback(msg);
+            }
+        ));
     }
     
     subscription_listener_thread_ = std::thread(std::bind(&laser_merger2::laser_merge, this));
