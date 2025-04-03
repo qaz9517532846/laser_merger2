@@ -6,11 +6,13 @@
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include <boost/bind.hpp>
+#include <pcl_ros/transforms.hpp>
 
 laser_merger2::laser_merger2() : Node("laser_merger2")
 {
     this->declare_parameter<std::string>("target_frame", "base_link");
     this->declare_parameter<std::vector<std::string>>("scan_topics", { "/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1" });
+    this->declare_parameter<std::vector<std::string>>("point_cloud_topics", { "/sick_s30b/laser/points0", "/sick_s30b/laser/points1" });
     this->declare_parameter<double>("transform_tolerance", 0.01);
     this->declare_parameter<double>("rate", 30.0);
     this->declare_parameter<int>("queue_size", 20);
@@ -26,6 +28,7 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
 
     this->get_parameter("target_frame", target_frame_);
     this->get_parameter("scan_topics", scan_topics);
+    this->get_parameter("point_cloud_topics", point_cloud_topics);
     this->get_parameter("transform_tolerance", tolerance_);
     this->get_parameter("rate", rate_);
     this->get_parameter("queue_size", input_queue_size_);
@@ -51,13 +54,30 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
         tf2_->setCreateTimerInterface(timer_interface);
         tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
 
-        size_t laser_num = scan_topics.size();
-        laser_sub.resize(laser_num);
+        size_t num_scan_sub = scan_topics.size();
+        laser_sub.resize(num_scan_sub);
         for(const std::string &scan_topic : scan_topics)
         {
+            if (scan_topic.empty())
+                continue;
+            RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting LaserScan messages", scan_topic.c_str());
             laser_sub.push_back(this->create_subscription<sensor_msgs::msg::LaserScan>(scan_topic, input_queue_size_, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
                 {
                     scanCallback(msg);
+                }
+            ));
+        }
+
+        size_t num_cloud_sub = point_cloud_topics.size();
+        point_cloud_sub.resize(num_cloud_sub);
+        for(const std::string &cloud_topic : point_cloud_topics)
+        {
+            if (cloud_topic.empty())
+                continue;
+            RCLCPP_INFO(this->get_logger(), "Subscribing to topic %s, expecting PointCloud2 messages", cloud_topic.c_str());
+            point_cloud_sub.push_back(this->create_subscription<sensor_msgs::msg::PointCloud2>(cloud_topic, input_queue_size_, [this](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+                {
+                    pointCloudCallback(msg);
                 }
             ));
         }
@@ -79,6 +99,14 @@ void laser_merger2::scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr sc
 
     laserTime = scan->header.stamp;
     scanBuffer[scan->header.frame_id] = scan;
+}
+
+void laser_merger2::pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr cloud)
+{
+    std::lock_guard<std::mutex> lock(nodeMutex_);
+
+    laserTime = cloud->header.stamp;
+    pointCloudBuffer[cloud->header.frame_id] = cloud;
 }
 
 Eigen::Matrix4d laser_merger2::Rotate3Z(double rad)
@@ -154,6 +182,42 @@ std::vector<SCAN_POINT_t> laser_merger2::scantoPointXYZ(const sensor_msgs::msg::
         point.z = scanPos(2, 0);
         if (has_intensity)
             point.intensity = scan->intensities[i];
+		points.emplace_back(point);
+	}
+	
+	return points;
+}
+
+std::vector<SCAN_POINT_t> laser_merger2::pointCloudtoPointXYZ(const sensor_msgs::msg::PointCloud2::SharedPtr cloud)
+{
+    std::vector<SCAN_POINT_t> points;
+
+    sensor_msgs::msg::PointCloud2 transformed_cloud;
+    if (!pcl_ros::transformPointCloud(target_frame_, *cloud, transformed_cloud, *tf2_.get())) {
+        RCLCPP_WARN(this->get_logger(), "Could not transform point cloud");
+        return points;
+    }
+
+    sensor_msgs::PointCloud2ConstIterator<float> iter_x(transformed_cloud, "x");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_y(transformed_cloud, "y");
+    sensor_msgs::PointCloud2ConstIterator<float> iter_z(transformed_cloud, "z");
+
+    bool has_intensity = std::find_if(cloud->fields.begin(), cloud->fields.end(), [](const auto &field) {
+        return field.name == "intensity";
+    }) != cloud->fields.end();
+    sensor_msgs::PointCloud2ConstIterator<float> iter_intensity(transformed_cloud, "intensity");
+
+    for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z) {
+        SCAN_POINT_t point;
+        point.x = *iter_x;
+        point.y = *iter_y;
+        point.z = *iter_z;
+
+        if (has_intensity) {
+            point.intensity = *iter_intensity;
+            ++iter_intensity;
+        }
+
 		points.emplace_back(point);
 	}
 	
@@ -291,6 +355,13 @@ void laser_merger2::laser_merge()
                 points.insert(points.end(), scanPoints.begin(), scanPoints.end());
             }
             scanBuffer.clear();
+
+            for(const auto& cloud : pointCloudBuffer)
+            {
+                auto cloudPoints = pointCloudtoPointXYZ(cloud.second);
+                points.insert(points.end(), cloudPoints.begin(), cloudPoints.end());
+            }
+            pointCloudBuffer.clear();
         }
 
         if (!points.empty()) {
