@@ -52,8 +52,6 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
     tf2_->setCreateTimerInterface(timer_interface);
     tf2_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf2_);
 
-    size_t num_scan_sub = scan_topics.size();
-    laser_sub.resize(num_scan_sub);
     for(const std::string &scan_topic : scan_topics)
     {
         if (scan_topic.empty())
@@ -66,8 +64,6 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
         ));
     }
 
-    size_t num_cloud_sub = point_cloud_topics.size();
-    point_cloud_sub.resize(num_cloud_sub);
     for(const std::string &cloud_topic : point_cloud_topics)
     {
         if (cloud_topic.empty())
@@ -78,6 +74,12 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
                 pointCloudCallback(msg);
             }
         ));
+    }
+
+    if (laser_sub.empty() && point_cloud_sub.empty()) {
+        const char *error_message = "No topic was provided to read input laser scans or point clouds";
+        RCLCPP_ERROR(this->get_logger(), error_message);
+        throw std::runtime_error(error_message);
     }
     
     subscription_listener_thread_ = std::thread(std::bind(&laser_merger2::laser_merge, this));
@@ -215,10 +217,10 @@ std::vector<SCAN_POINT_t> laser_merger2::pointCloudtoPointXYZ(const sensor_msgs:
             ++iter_intensity;
         }
 
-		points.emplace_back(point);
-	}
-	
-	return points;
+        points.emplace_back(point);
+    }
+
+    return points;
 }
 
 uint32_t laser_merger2::rgb_to_uint32(uint8_t r, uint8_t g, uint8_t b)
