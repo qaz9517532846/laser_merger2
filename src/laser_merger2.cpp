@@ -211,35 +211,46 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
                                          "z", 1, sensor_msgs::msg::PointField::FLOAT32,
                                          "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
                                          // "rgb", 1, sensor_msgs::msg::PointField::FLOAT32);
-    }
-    else
-    {
-        modifier.setPointCloud2Fields(4, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32);
-    }
 
-    sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(*pclMsg, "intensity");
-    //sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
+        sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
+        sensor_msgs::PointCloud2Iterator<float> iter_intensity(*pclMsg, "intensity");
+        // sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
 
-    for(size_t i = 0; i < pclMsg->width; i++)
-    {
-        //uint32_t rgb_value = rgb_to_uint32(255, 0, 0);
-        *iter_x = points[i].x;
-        *iter_y = points[i].y;
-        *iter_z = points[i].z;
-        if (has_intensity)
+        for(size_t i = 0; i < pclMsg->width; i++)
+        {
+            //uint32_t rgb_value = rgb_to_uint32(255, 0, 0);
+            *iter_x = points[i].x;
+            *iter_y = points[i].y;
+            *iter_z = points[i].z;
             *iter_intensity = points[i].intensity.value();
 
-        /*float* rgb_ptr = reinterpret_cast<float*>(&rgb_value);
-        *iter_rgb = *rgb_ptr;*/
+            /*float* rgb_ptr = reinterpret_cast<float*>(&rgb_value);
+            *iter_rgb = *rgb_ptr;*/
 
-        ++iter_x; ++iter_y; ++iter_z; //++iter_rgb;
-        if (has_intensity)
+            ++iter_x; ++iter_y; ++iter_z; //++iter_rgb;
             ++iter_intensity;
+        }
+
+    } else {
+        modifier.setPointCloud2Fields(3, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32);
+
+
+        sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
+
+        for(size_t i = 0; i < pclMsg->width; i++)
+        {
+            *iter_x = points[i].x;
+            *iter_y = points[i].y;
+            *iter_z = points[i].z;
+
+            ++iter_x; ++iter_y; ++iter_z;
+        }
     }
 
     pclPub_->publish(*pclMsg);
