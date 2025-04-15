@@ -10,7 +10,7 @@
 laser_merger2::laser_merger2() : Node("laser_merger2")
 {
     this->declare_parameter<std::string>("target_frame", "base_link");
-    this->declare_parameter<std::vector<std::string>>("scan_topics", { "/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1" });
+    this->declare_parameter<std::vector<std::string>>("scan_topics");
     this->declare_parameter<double>("transform_tolerance", 0.01);
     this->declare_parameter<double>("rate", 30.0);
     this->declare_parameter<int>("queue_size", 20);
