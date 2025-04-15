@@ -76,6 +76,7 @@ class laser_merger2 : public rclcpp::Node
     std::shared_ptr<rclcpp::Rate> rosRate;
     std::string target_frame_;
     std::vector<std::string> scan_topics;
+    std::vector<std::string> qos_profiles;
     double tolerance_;
     double rate_;
     int input_queue_size_;

@@ -12,6 +12,7 @@ from launch.substitutions import ThisLaunchFileDir
 def generate_launch_description():
     target_frame = LaunchConfiguration('target_frame', default='base_link')
     scan_topics = LaunchConfiguration('scan_topics', default=["/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1"])
+    qos_profiles = LaunchConfiguration('qos_profiles', default=["reliable", "reliable"])
     transform_tolerance = LaunchConfiguration('transform_tolerance', default=0.1)
     rate = LaunchConfiguration('rate', default=30.0)
     queue_size = LaunchConfiguration('queue_size', default=10)
@@ -35,6 +36,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'target_frame': target_frame},
                         {'scan_topics': scan_topics},
+                        {'qos_profiles': qos_profiles},
                         {'transform_tolerance': transform_tolerance},
                         {'rate': rate},
                         {'queue_size': queue_size},

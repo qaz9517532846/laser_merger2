@@ -10,7 +10,8 @@
 laser_merger2::laser_merger2() : Node("laser_merger2")
 {
     this->declare_parameter<std::string>("target_frame", "base_link");
-    this->declare_parameter<std::vector<std::string>>("scan_topics", { "/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1" });
+    this->declare_parameter<std::vector<std::string>>("scan_topics");
+    this->declare_parameter<std::vector<std::string>>("qos_profiles");
     this->declare_parameter<double>("transform_tolerance", 0.01);
     this->declare_parameter<double>("rate", 30.0);
     this->declare_parameter<int>("queue_size", 20);
@@ -26,6 +27,7 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
 
     this->get_parameter("target_frame", target_frame_);
     this->get_parameter("scan_topics", scan_topics);
+    this->get_parameter("qos_profiles", qos_profiles);
     this->get_parameter("transform_tolerance", tolerance_);
     this->get_parameter("rate", rate_);
     this->get_parameter("queue_size", input_queue_size_);
@@ -53,13 +55,36 @@ laser_merger2::laser_merger2() : Node("laser_merger2")
 
         size_t laser_num = scan_topics.size();
         laser_sub.resize(laser_num);
-        for(const std::string &scan_topic : scan_topics)
+        for (size_t i = 0; i < laser_num; ++i)
         {
-            laser_sub.push_back(this->create_subscription<sensor_msgs::msg::LaserScan>(scan_topic, input_queue_size_, [this](const sensor_msgs::msg::LaserScan::SharedPtr msg)
-                {
+            const std::string &scan_topic = scan_topics[i];
+            std::string qos_profile_str;
+            rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
+
+            if (i < qos_profiles.size()) {
+                if (qos_profiles[i] == "reliable") {
+                    qos_profile_str = "reliable1";
+                    qos_profile.reliable();
+                } else if (qos_profiles[i] == "besteffort") {
+                    qos_profile_str = "besteffort";
+                    qos_profile.best_effort();
+                } else {
+                    qos_profile_str = "reliable2";
+                    qos_profile.reliable();
+                }
+            } else {
+                qos_profile_str = "reliable3";
+                qos_profile.reliable();
+            }
+
+            RCLCPP_DEBUG(this->get_logger(), "Subscribing to scan topic '%s' with QoS profile '%s'", scan_topic.c_str(), qos_profile_str.c_str());
+            laser_sub[i] = this->create_subscription<sensor_msgs::msg::LaserScan>(
+                scan_topic,
+                qos_profile,
+                [this](const sensor_msgs::msg::LaserScan::SharedPtr msg) {
                     scanCallback(msg);
                 }
-            ));
+            );
         }
     }
     
@@ -186,35 +211,46 @@ void laser_merger2::ConvertPointCloud2(std::vector<SCAN_POINT_t> points)
                                          "z", 1, sensor_msgs::msg::PointField::FLOAT32,
                                          "intensity", 1, sensor_msgs::msg::PointField::FLOAT32);
                                          // "rgb", 1, sensor_msgs::msg::PointField::FLOAT32);
-    }
-    else
-    {
-        modifier.setPointCloud2Fields(4, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32);
-    }
 
-    sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(*pclMsg, "intensity");
-    //sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
+        sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
+        sensor_msgs::PointCloud2Iterator<float> iter_intensity(*pclMsg, "intensity");
+        // sensor_msgs::PointCloud2Iterator<float> iter_rgb(*pclMsg, "rgb");
 
-    for(size_t i = 0; i < pclMsg->width; i++)
-    {
-        //uint32_t rgb_value = rgb_to_uint32(255, 0, 0);
-        *iter_x = points[i].x;
-        *iter_y = points[i].y;
-        *iter_z = points[i].z;
-        if (has_intensity)
+        for(size_t i = 0; i < pclMsg->width; i++)
+        {
+            //uint32_t rgb_value = rgb_to_uint32(255, 0, 0);
+            *iter_x = points[i].x;
+            *iter_y = points[i].y;
+            *iter_z = points[i].z;
             *iter_intensity = points[i].intensity.value();
 
-        /*float* rgb_ptr = reinterpret_cast<float*>(&rgb_value);
-        *iter_rgb = *rgb_ptr;*/
+            /*float* rgb_ptr = reinterpret_cast<float*>(&rgb_value);
+            *iter_rgb = *rgb_ptr;*/
 
-        ++iter_x; ++iter_y; ++iter_z; //++iter_rgb;
-        if (has_intensity)
+            ++iter_x; ++iter_y; ++iter_z; //++iter_rgb;
             ++iter_intensity;
+        }
+
+    } else {
+        modifier.setPointCloud2Fields(3, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+                                         "z", 1, sensor_msgs::msg::PointField::FLOAT32);
+
+
+        sensor_msgs::PointCloud2Iterator<float> iter_x(*pclMsg, "x");
+        sensor_msgs::PointCloud2Iterator<float> iter_y(*pclMsg, "y");
+        sensor_msgs::PointCloud2Iterator<float> iter_z(*pclMsg, "z");
+
+        for(size_t i = 0; i < pclMsg->width; i++)
+        {
+            *iter_x = points[i].x;
+            *iter_y = points[i].y;
+            *iter_z = points[i].z;
+
+            ++iter_x; ++iter_y; ++iter_z;
+        }
     }
 
     pclPub_->publish(*pclMsg);
@@ -286,6 +322,7 @@ void laser_merger2::laser_merge()
             // convert all scans to current base frame
             for(const auto& scan : scanBuffer)
             {
+                RCLCPP_DEBUG(this->get_logger(), "Processing scan buffer for frame_id: %s", scan.first.c_str());
                 auto scanPoints = scantoPointXYZ(scan.second);
                 points.insert(points.end(), scanPoints.begin(), scanPoints.end());
             }
@@ -300,5 +337,4 @@ void laser_merger2::laser_merge()
 
         rosRate->sleep();
     }
-    
 }
