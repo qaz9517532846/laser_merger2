@@ -28,6 +28,7 @@ $ git clone https://github.com/qaz9517532846/laser_merger2.git
 | ---                                | ---                                                               | 
 | target_frame                       | target tf frame(Default: "base_link").                            |
 | scan_topics                        | List of topics on which to read the laser scans                   |
+| point_cloud_topics                 | List of topics on which to read the point clouds (PointCloud2)    |
 | transform_tolerance                | TF transform tolerance.                                           |
 | rate                               | Publish rate(Hz).                                                 |
 | queue_size                         | Subscribe queue size.                                             |
@@ -53,6 +54,8 @@ For example:
 ``` bash
 $ ros2 launch laser_merger2 laser_merger.launch.py target_frame:=base scan_topics:="[/lidar, /lidar2]" output_pointcloud_topic:=/merged_pcl
 ```
+
+Note that laser_merger2 can merge `LaserScan` and/or `PointCloud2` messages, depending on the topics you provide with the `scan_topics` and `point_cloud_topics` arguments.
 
 ### Result
 

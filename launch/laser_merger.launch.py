@@ -11,7 +11,12 @@ from launch.substitutions import ThisLaunchFileDir
 
 def generate_launch_description():
     target_frame = LaunchConfiguration('target_frame', default='base_link')
-    scan_topics = LaunchConfiguration('scan_topics', default=["/sick_s30b/laser/scan0", "/sick_s30b/laser/scan1"])
+    # We set the topic arrays to a default value of an array containing an empty string, because
+    # ROS2 does not yet allow empty sequences for both launch arguments (cf https://github.com/ros2/launch_ros/blob/humble/launch_ros/launch_ros/utilities/evaluate_parameters.py#L50)
+    # and rclcpp parameters (cf https://github.com/ros2/rclcpp/issues/1955).
+    # In the code, we simply ignore empty topic names.
+    scan_topics = LaunchConfiguration('scan_topics', default="['']")
+    point_cloud_topics = LaunchConfiguration('point_cloud_topics', default="['']")
     transform_tolerance = LaunchConfiguration('transform_tolerance', default=0.1)
     rate = LaunchConfiguration('rate', default=30.0)
     queue_size = LaunchConfiguration('queue_size', default=10)
@@ -35,6 +40,7 @@ def generate_launch_description():
             output='screen',
             parameters=[{'target_frame': target_frame},
                         {'scan_topics': scan_topics},
+                        {'point_cloud_topics': point_cloud_topics},
                         {'transform_tolerance': transform_tolerance},
                         {'rate': rate},
                         {'queue_size': queue_size},

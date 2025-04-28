@@ -44,7 +44,9 @@ class laser_merger2 : public rclcpp::Node
 
   private:
     void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan);
+    void pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr cloud);
     std::vector<SCAN_POINT_t> scantoPointXYZ(const sensor_msgs::msg::LaserScan::SharedPtr scan);
+    std::vector<SCAN_POINT_t> pointCloudtoPointXYZ(const sensor_msgs::msg::PointCloud2::SharedPtr cloud);
     Eigen::Matrix4d Rotate3Z(double rad);
     Eigen::Matrix4d ConvertTransMatrix(geometry_msgs::msg::TransformStamped trans);
     uint32_t rgb_to_uint32(uint8_t r, uint8_t g, uint8_t b);
@@ -58,11 +60,13 @@ class laser_merger2 : public rclcpp::Node
     std::unique_ptr<tf2_ros::TransformListener> tf2_listener_;
 
     std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr> laser_sub;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> point_cloud_sub;
 
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>> pclPub_;
     std::shared_ptr<rclcpp::Publisher<sensor_msgs::msg::LaserScan>> scanPub_;
 
     std::map<std::string, sensor_msgs::msg::LaserScan::SharedPtr> scanBuffer;
+    std::map<std::string, sensor_msgs::msg::PointCloud2::SharedPtr> pointCloudBuffer;
 
     std::thread subscription_listener_thread_;
     std::atomic_bool alive_{true};
@@ -76,6 +80,7 @@ class laser_merger2 : public rclcpp::Node
     std::shared_ptr<rclcpp::Rate> rosRate;
     std::string target_frame_;
     std::vector<std::string> scan_topics;
+    std::vector<std::string> point_cloud_topics;
     double tolerance_;
     double rate_;
     int input_queue_size_;
